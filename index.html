@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Integración Numérica - Métodos Numéricos UMSA</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- MathJax for rendering LaTeX math formulas -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: {
+                            50: '#f0f4f8',
+                            100: '#d9e2ec',
+                            500: '#334e68',
+                            800: '#102a43',
+                            900: '#061727',
+                        },
+                        accent: '#2b6cb0'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+        .tab-active { border-bottom: 3px solid #1a365d; color: #1a365d; font-weight: 700; }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen">
+
+    <!-- Header / Navbar -->
+    <header class="bg-navy-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-2">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-2 rounded-lg text-white">
+                    <i class="fa-solid me-1 fa-calculator text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg md:text-xl tracking-tight leading-none">Integración Numérica Multimétodo</h1>
+                    <p class="text-xs text-blue-200 mt-1">Desafío Grupal de Métodos Numéricos &bull; La Paz, Bolivia</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2 w-full md:w-auto overflow-x-auto py-1">
+                <label class="text-xs text-slate-300 font-semibold whitespace-nowrap"><i class="fa-solid fa-folder-open mr-1"></i> Precargar Ejercicio:</label>
+                <select id="presetSelector" onchange="loadPreset(this.value)" class="bg-navy-800 text-slate-100 text-xs rounded-md border border-slate-600 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[280px] md:max-w-xs">
+                    <option value="">-- Seleccionar Ejercicio Preconfigurado --</option>
+                    <option value="test">PRUEBA VALIDACIÓN: f(x) = x² [0, 2] (Exacto 8/3)</option>
+                    <option value="19">Ejercicio 19: Vehículo (v(t) - Distancia)</option>
+                    <option value="20">Ejercicio 20: Banda Elástica (F(x) - Trabajo)</option>
+                    <option value="21">Ejercicio 21: Perfil Topográfico (Área)</option>
+                    <option value="22">Ejercicio 22: Cable Suspendido (Catenaria)</option>
+                    <option value="23">Ejercicio 23: Tubería (Perfil Turbulento)</option>
+                    <option value="24">Ejercicio 24: Cardioide Paramétrica (Longitud)</option>
+                    <option value="25">Ejercicio 25: Satélite (Energía Gravitatoria)</option>
+                    <option value="26">Ejercicio 26: Superficie de Lago (Erie/Titicaca)</option>
+                    <option value="27">Ejercicio 27: Objeto Alargado (Volumen)</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Column: Settings & Input Forms -->
+        <div class="lg:col-span-5 space-y-5">
+            
+            <!-- Input Method Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="border-b border-slate-200 bg-slate-100/80 px-4 py-3 flex justify-between items-center">
+                    <h2 class="font-bold text-navy-900 text-sm uppercase tracking-wider flex items-center">
+                        <i class="fa-solid fa-sliders text-blue-600 mr-2"></i> Modalidad de Entrada
+                    </h2>
+                </div>
+                
+                <div class="p-4">
+                    <!-- Tab Buttons -->
+                    <div class="flex border-b border-slate-200 mb-4">
+                        <button id="tabFuncBtn" onclick="switchInputTab('func')" class="flex-1 py-2 text-sm text-center tab-active transition-all">
+                            <i class="fa-solid fa-square-root-variable mr-1"></i> Función Matem. $f(x)$
+                        </button>
+                        <button id="tabTableBtn" onclick="switchInputTab('table')" class="flex-1 py-2 text-sm text-center text-slate-500 hover:text-navy-900 transition-all">
+                            <i class="fa-solid fa-table-cells mr-1"></i> Datos Tabulados $(x, y)$
+                        </button>
+                    </div>
+
+                    <!-- Mode A: Function Input Form -->
+                    <div id="funcForm" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Función $f(x)$ (expresión en JS/Math):</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm font-mono">f(x) =</span>
+                                <input type="text" id="funcExpr" value="x**2" placeholder="ej. x**2, Math.sin(x), Math.cosh(x/24)" class="w-full pl-16 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono">
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-1">Usa sintaxis JS: <code>Math.sin(x)</code>, <code>Math.sqrt(x)</code>, <code>Math.cosh(x)</code>, <code>x**2</code>.</p>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Límite $a$:</label>
+                                <input type="number" step="any" id="limitA" value="0" class="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Límite $b$:</label>
+                                <input type="number" step="any" id="limitB" value="2" class="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Subintervalos ($n$):</label>
+                                <input type="number" step="1" min="1" id="numN" value="4" class="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mode B: Tabulated Data Form -->
+                    <div id="tableForm" class="space-y-4 hidden">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-xs font-semibold text-slate-700">Entrada Rápida por Comas:</label>
+                                <button onclick="parseCommaData()" class="text-xs text-blue-600 hover:underline"><i class="fa-solid fa-sync mr-1"></i>Cargar a Tabla</button>
+                            </div>
+                            <div class="space-y-1">
+                                <input type="text" id="csvX" placeholder="Valores de X ej: 0, 1, 2, 3, 4" class="w-full px-3 py-1 text-xs border border-slate-300 rounded-md font-mono mb-1">
+                                <input type="text" id="csvY" placeholder="Valores de Y ej: 0, 14, 39, 69, 95" class="w-full px-3 py-1 text-xs border border-slate-300 rounded-md font-mono">
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-xs font-semibold text-slate-700">Puntos $(x_i, y_i)$:</label>
+                                <div class="space-x-1">
+                                    <button onclick="addTableRow()" class="px-2 py-0.5 text-xs bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200"><i class="fa-solid fa-plus mr-1"></i>Fila</button>
+                                    <button onclick="clearTable()" class="px-2 py-0.5 text-xs bg-rose-100 text-rose-700 rounded hover:bg-rose-200"><i class="fa-solid fa-trash mr-1"></i>Limpiar</button>
+                                </div>
+                            </div>
+                            
+                            <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg">
+                                <table class="w-full text-xs text-left">
+                                    <thead class="bg-slate-100 text-slate-600 sticky top-0">
+                                        <tr>
+                                            <th class="p-2 border-b w-12 text-center">i</th>
+                                            <th class="p-2 border-b">x_i</th>
+                                            <th class="p-2 border-b">y_i = f(x_i)</th>
+                                            <th class="p-2 border-b w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dataTableBody">
+                                        <!-- Rows dynamically inserted -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Units & Reference Value Section -->
+                    <div class="mt-4 pt-3 border-t border-slate-200 grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Unidad Física:</label>
+                            <input type="text" id="unitInput" value="u²" placeholder="ej. m, J, mi, in³/s" class="w-full px-2.5 py-1 text-xs border border-slate-300 rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Valor Exacto/Ref. (opcional):</label>
+                            <input type="number" step="any" id="refValueInput" placeholder="Ej. 2.666667 (8/3)" class="w-full px-2.5 py-1 text-xs border border-slate-300 rounded-md">
+                        </div>
+                    </div>
+
+                    <!-- Method Selector -->
+                    <div class="mt-4">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1"><i class="fa-solid fa-diagram-project text-blue-600 mr-1"></i> Método Numérico:</label>
+                        <select id="methodSelector" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg font-semibold text-navy-900 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="auto">⚡ Selección Inteligente / Combinado Automático</option>
+                            <option value="trapezoid">Trapecio Compuesto</option>
+                            <option value="simpson13">Simpson 1/3 Compuesto (Requiere n par)</option>
+                            <option value="simpson38">Simpson 3/8 Compuesto (Requiere n múltiplo de 3)</option>
+                            <option value="combined">Combinado Manual (Simpson 1/3 + Simpson 3/8 o Trapecio)</option>
+                        </select>
+                    </div>
+
+                    <!-- Compute Button -->
+                    <button onclick="calculateIntegration()" class="mt-5 w-full bg-navy-800 hover:bg-navy-900 text-white font-bold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-play text-xs text-blue-400"></i>
+                        <span>Calcular Integración Numérica</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error Banner Container -->
+            <div id="errorAlert" class="hidden bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-lg shadow-sm">
+                <div class="flex items-start">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-500 mt-0.5 mr-3"></i>
+                    <div>
+                        <h4 class="text-xs font-bold text-rose-800 uppercase tracking-wide">Error de Validación</h4>
+                        <p id="errorMessage" class="text-xs text-rose-700 mt-1"></p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Results, Charts & Step-by-Step Table -->
+        <div class="lg:col-span-7 space-y-5">
+            
+            <!-- Result Summary Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="border-b border-slate-200 bg-slate-100/80 px-4 py-3 flex justify-between items-center">
+                    <h2 class="font-bold text-navy-900 text-sm uppercase tracking-wider flex items-center">
+                        <i class="fa-solid fa-square-poll-vertical text-blue-600 mr-2"></i> Resultado del Cálculo
+                    </h2>
+                    <span id="badgeMethod" class="px-2.5 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-800">
+                        Esperando ejecución
+                    </span>
+                </div>
+
+                <div class="p-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Main Integral Result -->
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-center">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Integral Aproximada ($I$)</span>
+                            <div class="flex items-baseline space-x-2 mt-1">
+                                <span id="resIntegral" class="text-2xl sm:text-3xl font-extrabold text-navy-900">0.000000</span>
+                                <span id="resUnit" class="text-sm font-semibold text-slate-600">u²</span>
+                            </div>
+                            <span id="resFormulaDesc" class="text-[11px] text-slate-400 mt-1">h = 0 &bull; n = 0</span>
+                        </div>
+
+                        <!-- Error Statistics -->
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-between">
+                            <div>
+                                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Error Absoluto / Porcentual</span>
+                                <div class="mt-1 space-y-1">
+                                    <div class="flex justify-between text-xs">
+                                        <span class="text-slate-600">Error Absoluto ($E_a$):</span>
+                                        <span id="resErrorAbs" class="font-mono font-bold text-slate-800">N/A</span>
+                                    </div>
+                                    <div class="flex justify-between text-xs">
+                                        <span class="text-slate-600">Error Porcentual ($E\%$):</span>
+                                        <span id="resErrorPct" class="font-mono font-bold text-blue-700">N/A</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-2 border-t border-slate-200 pt-1">
+                                Ref: <span id="resRefValDisplay" class="font-mono text-slate-600">No especificada</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Breakdown explanation box -->
+                    <div id="methodBreakdownBox" class="mt-4 p-3 bg-blue-50/60 border border-blue-200 rounded-lg text-xs text-navy-900 hidden">
+                        <strong class="font-semibold block mb-1 text-blue-900"><i class="fa-solid fa-circle-info mr-1"></i> Desglose del Esquema Aplicado:</strong>
+                        <div id="methodBreakdownText" class="space-y-1 text-slate-700"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visual Chart Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="border-b border-slate-200 bg-slate-100/80 px-4 py-3 flex justify-between items-center">
+                    <h2 class="font-bold text-navy-900 text-sm uppercase tracking-wider flex items-center">
+                        <i class="fa-solid fa-chart-area text-blue-600 mr-2"></i> Representación Gráfica (Área Bajo la Curva)
+                    </h2>
+                </div>
+                <div class="p-4">
+                    <div class="relative w-full h-64">
+                        <canvas id="integrationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Integration Step Factors Table -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="border-b border-slate-200 bg-slate-100/80 px-4 py-3 flex justify-between items-center">
+                    <h2 class="font-bold text-navy-900 text-sm uppercase tracking-wider flex items-center">
+                        <i class="fa-solid fa-list-check text-blue-600 mr-2"></i> Tabla de Factores/Pesos de Integración ($w_i$)
+                    </h2>
+                    <span class="text-xs text-slate-500">I = (Factor) &times; &sum;(w_i &middot; y_i)</span>
+                </div>
+                <div class="p-4">
+                    <div class="max-h-60 overflow-y-auto border border-slate-200 rounded-lg">
+                        <table class="w-full text-xs text-left border-collapse">
+                            <thead class="bg-slate-100 text-slate-700 sticky top-0 font-semibold">
+                                <tr>
+                                    <th class="p-2 border-b text-center">Nodo $i$</th>
+                                    <th class="p-2 border-b">$x_i$</th>
+                                    <th class="p-2 border-b">$f(x_i)$</th>
+                                    <th class="p-2 border-b text-center">Peso ($w_i$)</th>
+                                    <th class="p-2 border-b text-right">$w_i \cdot f(x_i)$</th>
+                                    <th class="p-2 border-b">Método Tramo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stepTableBody" class="divide-y divide-slate-100 font-mono">
+                                <tr>
+                                    <td colspan="6" class="text-center p-4 text-slate-400 font-sans">Ejecute el cálculo para ver el desglose de ponderaciones.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-navy-900 text-slate-400 text-xs py-4 border-t border-slate-800 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center space-y-1">
+            <p><strong>Desafío Grupal de Métodos Numéricos &bull; Universidad Mayor de San Andrés (UMSA)</strong></p>
+            <p>Verificación de Trapecio Compuesto, Simpson 1/3, Simpson 3/8 y combinaciones en problemas de La Paz, Bolivia.</p>
+        </div>
+    </footer>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        // Global variables state
+        let currentMode = 'func'; // 'func' or 'table'
+        let chartInstance = null;
+
+        // Presets Dataset from Document (Exercises 19 to 27 + Validation Test)
+        const PRESETS = {
+            'test': {
+                mode: 'func',
+                func: 'x**2',
+                a: 0,
+                b: 2,
+                n: 4,
+                unit: 'u²',
+                ref: 8/3,
+                title: 'Prueba de Validación f(x)=x² en [0,2]'
+            },
+            '19': {
+                mode: 'table',
+                x: [0, 1, 2, 3, 4, 5, 6, 7],
+                y: [0, 14, 39, 69, 95, 114, 129, 139],
+                unit: 'mi',
+                scaleFactor: 1/3600, // Converts seconds*mi/h to miles
+                ref: 0.147072,
+                title: 'Ejercicio 19: Distancia Vehículo (Combinado S1/3 + S3/8)'
+            },
+            '20': {
+                mode: 'table',
+                x: [0, 0.4, 0.8, 1.2, 1.6, 2.0, 2.4, 2.8],
+                y: [0, 0.85, 1.30, 1.60, 1.87, 2.14, 2.34, 2.52],
+                unit: 'lb·in',
+                ref: 4.577167,
+                title: 'Ejercicio 20: Trabajo Banda Elástica (Combinado S1/3 + S3/8)'
+            },
+            '21': {
+                mode: 'table',
+                x: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                y: [1.3, 3.7, 4.6, 4.4, 2.7, 2.5, 3.6, 5.3, 6.0, 5.9],
+                unit: 'u²',
+                ref: 36.85,
+                title: 'Ejercicio 21: Perfil Topográfico (Combinado S1/3 + Trapecio)'
+            },
+            '22': {
+                mode: 'func',
+                func: 'Math.cosh(x/24)',
+                a: -12,
+                b: 26,
+                n: 8,
+                unit: 'ft',
+                ref: 43.898841,
+                title: 'Ejercicio 22: Cable Catenaria y=24*cosh(x/24)'
+            },
+            '23': {
+                mode: 'func',
+                func: '160 * Math.PI * x * Math.pow(Math.max(0, 1 - x/0.25), 1/7)',
+                a: 0,
+                b: 0.25,
+                n: 8,
+                unit: 'in³/s',
+                ref: (49 * Math.PI)/12, // 12.828170
+                title: 'Ejercicio 23: Caudal en Tubería (Perfil Turbulento)'
+            },
+            '24': {
+                mode: 'func',
+                func: '20 * Math.sin(x/2)',
+                a: 0,
+                b: 2 * Math.PI,
+                n: 8,
+                unit: 'u',
+                ref: 80,
+                title: 'Ejercicio 24: Longitud Cardioide L = ∫20*sin(t/2)dt'
+            },
+            '25': {
+                mode: 'func',
+                // Delta U = m*g0*R^2 / (R+y)^2 ; m=500, g0=9.81, R=6371000
+                func: '(500 * 9.81 * Math.pow(6371000, 2)) / Math.pow(6371000 + x, 2)',
+                a: 0,
+                b: 800000,
+                n: 8,
+                unit: 'J',
+                ref: 3486236787,
+                title: 'Ejercicio 25: Energía Gravitatoria Satélite'
+            },
+            '26': {
+                mode: 'table',
+                x: [40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260],
+                y: [42, 50, 56, 52, 48, 55, 60, 58, 51, 45, 38, 30], // Anchuras representativas mapa
+                unit: 'mi²',
+                ref: 9940,
+                title: 'Ejercicio 26: Superficie de Lago (Mapa Erie/Titicaca)'
+            },
+            '27': {
+                // Volume V = PI * integral (d/2)^2 dz
+                mode: 'table',
+                x: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                y: [0, 1.3**2*Math.PI, 1.6**2*Math.PI, 2.4**2*Math.PI, 2.8**2*Math.PI, 3.0**2*Math.PI, 3.1**2*Math.PI, 3.0**2*Math.PI, 2.8**2*Math.PI, 2.4**2*Math.PI, 1.65**2*Math.PI, 1.3**2*Math.PI, 0],
+                unit: 'in³',
+                ref: 201.842092,
+                title: 'Ejercicio 27: Volumen de Objeto Alargado'
+            }
+        };
+
+        // Initialize UI on load
+        window.onload = function() {
+            initTableWithDefaultData();
+            initChart();
+            calculateIntegration();
+        };
+
+        // Switch Tabs between Function and Table modes
+        function switchInputTab(mode) {
+            currentMode = mode;
+            const tabFunc = document.getElementById('tabFuncBtn');
+            const tabTable = document.getElementById('tabTableBtn');
+            const formFunc = document.getElementById('funcForm');
+            const formTable = document.getElementById('tableForm');
+
+            if (mode === 'func') {
+                tabFunc.className = 'flex-1 py-2 text-sm text-center tab-active transition-all';
+                tabTable.className = 'flex-1 py-2 text-sm text-center text-slate-500 hover:text-navy-900 transition-all';
+                formFunc.classList.remove('hidden');
+                formTable.classList.add('hidden');
+            } else {
+                tabTable.className = 'flex-1 py-2 text-sm text-center tab-active transition-all';
+                tabFunc.className = 'flex-1 py-2 text-sm text-center text-slate-500 hover:text-navy-900 transition-all';
+                formTable.classList.remove('hidden');
+                formFunc.classList.add('hidden');
+            }
+        }
+
+        // Initialize table with sample values
+        function initTableWithDefaultData() {
+            const defaultX = [0, 1, 2, 3, 4, 5, 6, 7];
+            const defaultY = [0, 14, 39, 69, 95, 114, 129, 139];
+            populateTable(defaultX, defaultY);
+        }
+
+        function populateTable(xArray, yArray) {
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = '';
+            for (let i = 0; i < xArray.length; i++) {
+                addRowToTable(xArray[i], yArray[i]);
+            }
+            document.getElementById('csvX').value = xArray.join(', ');
+            document.getElementById('csvY').value = yArray.join(', ');
+        }
+
+        function addRowToTable(xVal = 0, yVal = 0) {
+            const tbody = document.getElementById('dataTableBody');
+            const index = tbody.rows.length;
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50';
+            tr.innerHTML = `
+                <td class="p-1.5 text-center font-bold text-slate-500">${index}</td>
+                <td class="p-1.5"><input type="number" step="any" value="${xVal}" class="table-x w-full px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500"></td>
+                <td class="p-1.5"><input type="number" step="any" value="${yVal}" class="table-y w-full px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500"></td>
+                <td class="p-1.5 text-center"><button onclick="removeRow(this)" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-xmark"></i></button></td>
+            `;
+            tbody.appendChild(tr);
+            updateTableIndices();
+        }
+
+        function addTableRow() {
+            const tbody = document.getElementById('dataTableBody');
+            let nextX = 0;
+            if (tbody.rows.length > 0) {
+                const lastXInputs = document.querySelectorAll('.table-x');
+                const lastX = parseFloat(lastXInputs[lastXInputs.length - 1].value) || 0;
+                let step = 1;
+                if (lastXInputs.length > 1) {
+                    const prevX = parseFloat(lastXInputs[lastXInputs.length - 2].value) || 0;
+                    step = lastX - prevX;
+                }
+                nextX = lastX + step;
+            }
+            addRowToTable(nextX, 0);
+        }
+
+        function removeRow(btn) {
+            const row = btn.closest('tr');
+            row.remove();
+            updateTableIndices();
+        }
+
+        function updateTableIndices() {
+            const rows = document.querySelectorAll('#dataTableBody tr');
+            rows.forEach((row, idx) => {
+                row.cells[0].innerText = idx;
+            });
+        }
+
+        function clearTable() {
+            document.getElementById('dataTableBody').innerHTML = '';
+            document.getElementById('csvX').value = '';
+            document.getElementById('csvY').value = '';
+        }
+
+        function parseCommaData() {
+            const xStr = document.getElementById('csvX').value;
+            const yStr = document.getElementById('csvY').value;
+
+            const xVals = xStr.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+            const yVals = yStr.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+
+            if (xVals.length === 0 || yVals.length === 0) {
+                showError('Ingrese valores numéricos válidos separados por comas.');
+                return;
+            }
+            if (xVals.length !== yVals.length) {
+                showError(`La cantidad de elementos en X (${xVals.length}) y Y (${yVals.length}) debe ser idéntica.`);
+                return;
+            }
+
+            hideError();
+            populateTable(xVals, yVals);
+        }
+
+        // Load Exercise Presets
+        function loadPreset(key) {
+            if (!key || !PRESETS[key]) return;
+            const preset = PRESETS[key];
+            
+            document.getElementById('unitInput').value = preset.unit || 'u²';
+            document.getElementById('refValueInput').value = preset.ref !== undefined ? preset.ref : '';
+
+            if (preset.mode === 'func') {
+                switchInputTab('func');
+                document.getElementById('funcExpr').value = preset.func;
+                document.getElementById('limitA').value = preset.a;
+                document.getElementById('limitB').value = preset.b;
+                document.getElementById('numN').value = preset.n;
+            } else {
+                switchInputTab('table');
+                populateTable(preset.x, preset.y);
+            }
+
+            document.getElementById('methodSelector').value = 'auto';
+            calculateIntegration();
+        }
+
+        // Safe Function Evaluator
+        function evaluateFunction(expr, x) {
+            try {
+                // Replace common Math functions for friendly input
+                let cleanExpr = expr
+                    .replace(/sin/g, 'Math.sin')
+                    .replace(/cos/g, 'Math.cos')
+                    .replace(/tan/g, 'Math.tan')
+                    .replace(/sqrt/g, 'Math.sqrt')
+                    .replace(/cosh/g, 'Math.cosh')
+                    .replace(/sinh/g, 'Math.sinh')
+                    .replace(/PI/g, 'Math.PI')
+                    .replace(/Math\.Math\./g, 'Math.'); // Clean accidental double Math
+
+                const f = new Function('x', `return ${cleanExpr};`);
+                return f(x);
+            } catch (e) {
+                throw new Error('Expresión matemática no válida. Revisa la sintaxis de f(x).');
+            }
+        }
+
+        // Main Calculation Controller
+        function calculateIntegration() {
+            hideError();
+            
+            let xData = [];
+            let yData = [];
+            let n = 0;
+            let h = 0;
+            let scaleFactor = 1;
+
+            // Check if current loaded preset requires a scale factor (e.g., Ex 19 seconds to hours)
+            const presetKey = document.getElementById('presetSelector').value;
+            if (presetKey && PRESETS[presetKey] && PRESETS[presetKey].scaleFactor) {
+                scaleFactor = PRESETS[presetKey].scaleFactor;
+            }
+
+            try {
+                if (currentMode === 'func') {
+                    const funcExpr = document.getElementById('funcExpr').value.trim();
+                    const a = parseFloat(document.getElementById('limitA').value);
+                    const b = parseFloat(document.getElementById('limitB').value);
+                    n = parseInt(document.getElementById('numN').value);
+
+                    if (isNaN(a) || isNaN(b) || isNaN(n)) {
+                        throw new Error('Los límites (a, b) y el número de subintervalos (n) deben ser números válidos.');
+                    }
+                    if (n <= 0) {
+                        throw new Error('El número de subintervalos (n) debe ser mayor a 0.');
+                    }
+                    if (a >= b) {
+                        throw new Error('El límite inferior (a) debe ser estrictamente menor que el límite superior (b).');
+                    }
+
+                    h = (b - a) / n;
+                    for (let i = 0; i <= n; i++) {
+                        const xi = a + i * h;
+                        const yi = evaluateFunction(funcExpr, xi);
+                        if (isNaN(yi) || !isFinite(yi)) {
+                            throw new Error(`La función devolvió un valor no numérico o infinito en x = ${xi}`);
+                        }
+                        xData.push(xi);
+                        yData.push(yi);
+                    }
+                } else {
+                    // Extract from table inputs
+                    const xInputs = document.querySelectorAll('.table-x');
+                    const yInputs = document.querySelectorAll('.table-y');
+
+                    if (xInputs.length < 2) {
+                        throw new Error('Se requieren al menos 2 puntos (1 subintervalo) para la integración.');
+                    }
+
+                    for (let i = 0; i < xInputs.length; i++) {
+                        const xi = parseFloat(xInputs[i].value);
+                        const yi = parseFloat(yInputs[i].value);
+                        if (isNaN(xi) || isNaN(yi)) {
+                            throw new Error(`Fila ${i}: Los valores de X y Y deben ser datos numéricos.`);
+                        }
+                        xData.push(xi);
+                        yData.push(yi);
+                    }
+
+                    n = xData.length - 1;
+
+                    // Validation 1: Strictly Increasing X
+                    for (let i = 1; i < xData.length; i++) {
+                        if (xData[i] <= xData[i - 1]) {
+                            throw new Error(`Validación de datos: x[${i}] (${xData[i]}) debe ser mayor que x[${i-1}] (${xData[i-1]}). Los nodos deben estar en orden estrictamente creciente.`);
+                        }
+                    }
+
+                    // Validation 2: Uniform Spacing h
+                    h = xData[1] - xData[0];
+                    const tol = 1e-5;
+                    for (let i = 1; i < n; i++) {
+                        const currentH = xData[i + 1] - xData[i];
+                        if (Math.abs(currentH - h) > tol) {
+                            throw new Error(`Espaciamiento desigual detectado: h[0] = ${h.toFixed(4)}, pero h[${i}] = ${currentH.toFixed(4)}. Los métodos requieren nodos igualmente espaciados.`);
+                        }
+                    }
+                }
+
+                // Select Method and Calculate
+                const selectedMethod = document.getElementById('methodSelector').value;
+                let resultObj = null;
+
+                if (selectedMethod === 'trapezoid') {
+                    resultObj = calcTrapezoid(yData, h);
+                } else if (selectedMethod === 'simpson13') {
+                    if (n % 2 !== 0) {
+                        throw new Error(`Simpson 1/3 requiere un número PAR de subintervalos (n). Actualmente n = ${n}. Considere la 'Selección Inteligente / Combinado'.`);
+                    }
+                    resultObj = calcSimpson13(yData, h);
+                } else if (selectedMethod === 'simpson38') {
+                    if (n % 3 !== 0) {
+                        throw new Error(`Simpson 3/8 requiere un número de subintervalos (n) MÚLTIPLO DE 3. Actualmente n = ${n}. Considere la 'Selección Inteligente / Combinado'.`);
+                    }
+                    resultObj = calcSimpson38(yData, h);
+                } else { // 'auto' or 'combined'
+                    resultObj = calcCombined(yData, h, n);
+                }
+
+                // Apply conversion scale factor if applicable
+                resultObj.integral *= scaleFactor;
+
+                // Render Results
+                renderResults(resultObj, xData, yData, n, h);
+                updateChart(xData, yData);
+
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        // Integration Algorithms
+
+        // 1. Trapezoidal Rule
+        function calcTrapezoid(y, h) {
+            const n = y.length - 1;
+            const weights = new Array(y.length).fill(2);
+            weights[0] = 1;
+            weights[n] = 1;
+
+            let sum = 0;
+            const methodSegment = new Array(y.length).fill('Trapecio');
+
+            for (let i = 0; i < y.length; i++) {
+                sum += weights[i] * y[i];
+            }
+
+            const integral = (h / 2) * sum;
+            return {
+                integral: integral,
+                weights: weights.map(w => w / 2), // Absolute multiplier weights
+                rawWeights: weights,
+                globalFactor: 'h / 2',
+                methodName: 'Trapecio Compuesto',
+                breakdown: [`Aplicado Trapecio Compuesto uniformemente en todos los ${n} subintervalos.`],
+                segmentMethods: methodSegment
+            };
+        }
+
+        // 2. Simpson 1/3 Rule
+        function calcSimpson13(y, h) {
+            const n = y.length - 1;
+            const weights = new Array(y.length).fill(0);
+            weights[0] = 1;
+            weights[n] = 1;
+
+            for (let i = 1; i < n; i++) {
+                weights[i] = (i % 2 === 1) ? 4 : 2;
+            }
+
+            let sum = 0;
+            for (let i = 0; i < y.length; i++) {
+                sum += weights[i] * y[i];
+            }
+
+            const integral = (h / 3) * sum;
+            return {
+                integral: integral,
+                weights: weights.map(w => w / 3),
+                rawWeights: weights,
+                globalFactor: 'h / 3',
+                methodName: 'Simpson 1/3 Compuesto',
+                breakdown: [`Aplicado Simpson 1/3 en los ${n} subintervalos (n par).`],
+                segmentMethods: new Array(y.length).fill('Simpson 1/3')
+            };
+        }
+
+        // 3. Simpson 3/8 Rule
+        function calcSimpson38(y, h) {
+            const n = y.length - 1;
+            const weights = new Array(y.length).fill(0);
+            weights[0] = 1;
+            weights[n] = 1;
+
+            for (let i = 1; i < n; i++) {
+                weights[i] = (i % 3 === 0) ? 2 : 3;
+            }
+
+            let sum = 0;
+            for (let i = 0; i < y.length; i++) {
+                sum += weights[i] * y[i];
+            }
+
+            const integral = (3 * h / 8) * sum;
+            return {
+                integral: integral,
+                weights: weights.map(w => (3 * w) / 8),
+                rawWeights: weights,
+                globalFactor: '3h / 8',
+                methodName: 'Simpson 3/8 Compuesto',
+                breakdown: [`Aplicado Simpson 3/8 en los ${n} subintervalos (n múltiplo de 3).`],
+                segmentMethods: new Array(y.length).fill('Simpson 3/8')
+            };
+        }
+
+        // 4. Combined / Automatic Smart Method Selection
+        function calcCombined(y, h, n) {
+            // Case A: Perfect Simpson 1/3 (n is even)
+            if (n % 2 === 0) {
+                const res = calcSimpson13(y, h);
+                res.methodName = 'Simpson 1/3 Compuesto (Óptimo)';
+                return res;
+            }
+            
+            // Case B: n is multiple of 3 (and odd, e.g., n=3, 9, 15)
+            if (n % 3 === 0) {
+                const res = calcSimpson38(y, h);
+                res.methodName = 'Simpson 3/8 Compuesto (Óptimo)';
+                return res;
+            }
+
+            // Case C: Combined Simpson 1/3 + Simpson 3/8 (e.g., n=7 -> 4 subint S1/3 + 3 subint S3/8)
+            if (n >= 7 && (n - 3) % 2 === 0) {
+                const n1 = n - 3; // Even part for Simpson 1/3
+                const y1 = y.slice(0, n1 + 1);
+                const y2 = y.slice(n1);
+
+                const res1 = calcSimpson13(y1, h);
+                const res2 = calcSimpson38(y2, h);
+
+                const totalIntegral = res1.integral + res2.integral;
+
+                // Merge weights for step table
+                const mergedWeights = new Array(y.length).fill(0);
+                const segmentMethods = new Array(y.length);
+
+                for (let i = 0; i <= n1; i++) {
+                    mergedWeights[i] += res1.weights[i];
+                    segmentMethods[i] = 'Simpson 1/3';
+                }
+                for (let j = 0; j <= 3; j++) {
+                    mergedWeights[n1 + j] += res2.weights[j];
+                    segmentMethods[n1 + j] = (j === 0) ? 'Empalme (S1/3+S3/8)' : 'Simpson 3/8';
+                }
+
+                return {
+                    integral: totalIntegral,
+                    weights: mergedWeights,
+                    methodName: 'Combinado (Simpson 1/3 + Simpson 3/8)',
+                    breakdown: [
+                        `Tramo 1 (x0 a x${n1}): Simpson 1/3 en ${n1} subintervalos = ${res1.integral.toFixed(6)}`,
+                        `Tramo 2 (x${n1} a x${n}): Simpson 3/8 en 3 subintervalos = ${res2.integral.toFixed(6)}`
+                    ],
+                    segmentMethods: segmentMethods
+                };
+            }
+
+            // Case D: Combined Simpson 1/3 + Trapezoid (e.g., n=9 or n=5 -> n-1 subint S1/3 + 1 subint Trap)
+            if ((n - 1) % 2 === 0) {
+                const n1 = n - 1;
+                const y1 = y.slice(0, n1 + 1);
+                const y2 = y.slice(n1);
+
+                const res1 = calcSimpson13(y1, h);
+                const res2 = calcTrapezoid(y2, h);
+
+                const totalIntegral = res1.integral + res2.integral;
+
+                const mergedWeights = new Array(y.length).fill(0);
+                const segmentMethods = new Array(y.length);
+
+                for (let i = 0; i <= n1; i++) {
+                    mergedWeights[i] += res1.weights[i];
+                    segmentMethods[i] = 'Simpson 1/3';
+                }
+                mergedWeights[n] += res2.weights[1];
+                segmentMethods[n] = 'Trapecio';
+
+                return {
+                    integral: totalIntegral,
+                    weights: mergedWeights,
+                    methodName: 'Combinado (Simpson 1/3 + Trapecio)',
+                    breakdown: [
+                        `Tramo 1 (x0 a x${n1}): Simpson 1/3 en ${n1} subintervalos = ${res1.integral.toFixed(6)}`,
+                        `Tramo 2 (x${n1} a x${n}): Trapecio Compuesto en 1 subintervalo = ${res2.integral.toFixed(6)}`
+                    ],
+                    segmentMethods: segmentMethods
+                };
+            }
+
+            // Fallback to pure Trapezoidal
+            return calcTrapezoid(y, h);
+        }
+
+        // Render Results to UI
+        function renderResults(res, xData, yData, n, h) {
+            // Main Integral Value
+            document.getElementById('resIntegral').innerText = res.integral.toFixed(6);
+            document.getElementById('badgeMethod').innerText = res.methodName;
+
+            const unit = document.getElementById('unitInput').value || 'u²';
+            document.getElementById('resUnit').innerText = unit;
+
+            document.getElementById('resFormulaDesc').innerText = `Ancho h = ${h.toFixed(6)} • Total Subintervalos n = ${n}`;
+
+            // Reference Value & Error Statistics
+            const refValInput = document.getElementById('refValueInput').value;
+            const refVal = parseFloat(refValInput);
+
+            if (!isNaN(refVal) && refVal !== 0) {
+                const absErr = Math.abs(refVal - res.integral);
+                const pctErr = (absErr / Math.abs(refVal)) * 100;
+
+                document.getElementById('resErrorAbs').innerText = absErr.toExponential(4);
+                document.getElementById('resErrorPct').innerText = `${pctErr.toFixed(6)} %`;
+                document.getElementById('resRefValDisplay').innerText = refVal.toFixed(6);
+            } else {
+                document.getElementById('resErrorAbs').innerText = 'N/A';
+                document.getElementById('resErrorPct').innerText = 'N/A';
+                document.getElementById('resRefValDisplay').innerText = 'No proporcionada';
+            }
+
+            // Method Breakdown Box
+            const breakdownBox = document.getElementById('methodBreakdownBox');
+            const breakdownText = document.getElementById('methodBreakdownText');
+            if (res.breakdown && res.breakdown.length > 0) {
+                breakdownBox.classList.remove('hidden');
+                breakdownText.innerHTML = res.breakdown.map(item => `<div>&bull; ${item}</div>`).join('');
+            } else {
+                breakdownBox.classList.add('hidden');
+            }
+
+            // Populate Step Weights Table
+            const stepTbody = document.getElementById('stepTableBody');
+            stepTbody.innerHTML = '';
+
+            for (let i = 0; i < xData.length; i++) {
+                const xi = xData[i];
+                const yi = yData[i];
+                const wi = res.weights[i];
+                const contrib = wi * yi;
+                const segMethod = res.segmentMethods ? res.segmentMethods[i] : res.methodName;
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50';
+                tr.innerHTML = `
+                    <td class="p-2 text-center font-bold text-slate-500">${i}</td>
+                    <td class="p-2 text-slate-800">${xi.toFixed(4)}</td>
+                    <td class="p-2 text-slate-800">${yi.toFixed(6)}</td>
+                    <td class="p-2 text-center font-bold text-blue-700">${wi.toFixed(6)}</td>
+                    <td class="p-2 text-right text-navy-900 font-semibold">${contrib.toFixed(6)}</td>
+                    <td class="p-2 text-slate-500 text-[11px]">${segMethod}</td>
+                `;
+                stepTbody.appendChild(tr);
+            }
+        }
+
+        // Chart.js Visualization
+        function initChart() {
+            const ctx = document.getElementById('integrationChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Área Bajo la Curva f(x)',
+                            data: [],
+                            fill: true,
+                            backgroundColor: 'rgba(43, 108, 176, 0.2)',
+                            borderColor: '#1a365d',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#2b6cb0',
+                            pointRadius: 4,
+                            tension: 0.2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `f(${context.label}) = ${context.parsed.y.toFixed(6)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Posición / Variable Independiente (x)' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Función f(x)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(xVals, yVals) {
+            if (!chartInstance) return;
+            chartInstance.data.labels = xVals.map(x => typeof x === 'number' ? x.toFixed(3) : x);
+            chartInstance.data.datasets[0].data = yVals;
+            chartInstance.update();
+        }
+
+        // Helper UI Notifications
+        function showError(msg) {
+            const errorAlert = document.getElementById('errorAlert');
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.innerText = msg;
+            errorAlert.classList.remove('hidden');
+        }
+
+        function hideError() {
+            document.getElementById('errorAlert').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
